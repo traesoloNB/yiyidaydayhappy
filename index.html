@@ -505,7 +505,7 @@
       transform: scale(0.96);
     }
 
-    .btn-send-email {
+    .btn-save-img {
       width: 100%;
       padding: 16px;
       background: linear-gradient(135deg, #4CAF50, #45a049);
@@ -520,15 +520,55 @@
       margin-top: 12px;
     }
 
-    .btn-send-email:active {
+    .btn-save-img:active {
       transform: scale(0.97);
     }
 
-    .email-hint {
+    .btn-copy-text {
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      border: 2px solid var(--pink-200);
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-mid);
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .btn-copy-text:active {
+      background: var(--pink-50);
+    }
+
+    .action-hint {
       font-size: 12px;
       color: var(--text-light);
       text-align: center;
       margin-top: 8px;
+    }
+
+    .copy-toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--text-dark);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 300;
+      pointer-events: none;
+    }
+
+    .copy-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     /* === Confetti === */
@@ -1175,9 +1215,11 @@
           <div class="result-message" id="resultMessage">
             选好了就等你一句话，<br>其他的交给我~
           </div>
-          <button class="btn-send-email" onclick="sendEmail()">📧 把约会回复发给TA</button>
-          <div class="email-hint">点击后会打开邮箱，直接发送即可~</div>
-          <button class="btn-restart" onclick="restart()">再约一次 💌</button>
+          <button class="btn-save-img" onclick="saveImage()">🖼️ 保存邀请函图片</button>
+          <div class="action-hint">保存图片后，在QQ邮箱里点附件→上传图片即可~</div>
+          <button class="btn-copy-text" onclick="copyReply()">📋 复制回复文字</button>
+          <div class="action-hint">复制后粘贴到邮箱正文，发给 651716077@qq.com</div>
+          <button class="btn-restart" onclick="restart()" style="margin-top:20px;">再约一次 💌</button>
         </div>
       </div>
 
@@ -1588,21 +1630,85 @@
 
     setTimeout(initPickers, 100);
 
-    // === Send Email ===
-    function sendEmail() {
-      var subject = '逸逸的约会回复 💕';
-      var body = '亲爱的，我选好啦！\n\n' +
+    // === Save Image ===
+    function saveImage() {
+      var card = document.getElementById('resultCard');
+      card.style.animation = 'none';
+
+      // Use html2canvas
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      script.onload = function() {
+        html2canvas(card, {
+          scale: 2,
+          backgroundColor: '#fef6f8',
+          useCORS: true,
+          logging: false
+        }).then(function(canvas) {
+          card.style.animation = '';
+          var link = document.createElement('a');
+          link.download = '约会邀请函💕.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          showToast('图片已保存！去QQ邮箱添加附件吧~');
+        }).catch(function() {
+          card.style.animation = '';
+          showToast('保存失败，请手动截图~');
+        });
+      };
+      script.onerror = function() {
+        card.style.animation = '';
+        showToast('加载截图组件失败，请手动长屏截图~');
+      };
+      document.head.appendChild(script);
+    }
+
+    // === Copy Reply Text ===
+    function copyReply() {
+      var text = '亲爱的，我选好啦！\n\n' +
         '🍽️ 一起吃：' + selections.food.value + '\n' +
         '🎯 一起做：' + selections.activity.value + '\n' +
         '📅 约在：' + selections.time.value + '\n\n' +
-        '等你来接我哦~ 💗\n\n' +
-        '（此邮件由约会小App自动生成）';
+        '等你来接我哦~ 💗';
 
-      var mailto = 'mailto:651716077@qq.com' +
-        '?subject=' + encodeURIComponent(subject) +
-        '&body=' + encodeURIComponent(body);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          showToast('已复制！打开QQ邮箱粘贴发送给 651716077@qq.com');
+        }).catch(function() {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
+    }
 
-      window.location.href = mailto;
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('已复制！打开QQ邮箱粘贴发送给 651716077@qq.com');
+      } catch(e) {
+        showToast('复制失败，请手动长按复制~');
+      }
+      document.body.removeChild(ta);
+    }
+
+    function showToast(msg) {
+      var toast = document.getElementById('copyToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'copyToast';
+        toast.className = 'copy-toast';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(function() { toast.classList.remove('show'); }, 2500);
     }
 
     // === Naughty Refuse Buttons ===
