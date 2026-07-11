@@ -2246,6 +2246,33 @@
         icon.textContent = '🎵';
       }
     }
+
+    // === Auto-play on first interaction ===
+    // Browsers block autoplay without user gesture, so start on first tap/click
+    var musicAutoStarted = false;
+    function tryAutoStartMusic() {
+      if (musicAutoStarted || musicPlaying) return;
+      musicAutoStarted = true;
+      // Init audio context on user gesture
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      musicPlaying = true;
+      noteIndex = 0;
+      var toggle = document.getElementById('musicToggle');
+      var icon = document.getElementById('musicIcon');
+      toggle.classList.add('playing');
+      icon.textContent = '🎶';
+      playMelodyNote();
+    }
+
+    // Listen for first interaction (covers click, touch, and keyboard)
+    document.addEventListener('click', tryAutoStartMusic, { once: true });
+    document.addEventListener('touchstart', tryAutoStartMusic, { once: true });
+    document.addEventListener('keydown', tryAutoStartMusic, { once: true });
   </script>
 
 </body>
