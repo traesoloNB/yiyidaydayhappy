@@ -622,6 +622,69 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    /* === Music Player === */
+    .music-toggle {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 2px solid var(--pink-200);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 999;
+      box-shadow: 0 2px 12px rgba(255, 92, 138, 0.2);
+      transition: all 0.3s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .music-toggle:active {
+      transform: scale(0.9);
+    }
+
+    .music-toggle.playing {
+      background: var(--pink-400);
+      border-color: var(--pink-500);
+      box-shadow: 0 2px 16px rgba(255, 92, 138, 0.4);
+    }
+
+    .music-toggle .music-icon {
+      font-size: 20px;
+      transition: transform 0.3s;
+    }
+
+    .music-toggle.playing .music-icon {
+      animation: musicSpin 3s linear infinite;
+    }
+
+    @keyframes musicSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    .music-pulse {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid var(--pink-300);
+      opacity: 0;
+      animation: pulseRing 2s ease-out infinite;
+    }
+
+    .music-toggle.playing .music-pulse {
+      opacity: 1;
+    }
+
+    @keyframes pulseRing {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+
     /* === Confetti === */
     .confetti-piece {
       position: fixed;
@@ -1002,6 +1065,10 @@
   </style>
 </head>
 <body>
+  <div class="music-toggle" id="musicToggle" onclick="toggleMusic()">
+    <span class="music-pulse"></span>
+    <span class="music-icon" id="musicIcon">🎵</span>
+  </div>
 
   <!-- Floating Hearts Background -->
   <div class="hearts-bg" id="heartsBg"></div>
@@ -2069,6 +2136,115 @@
       document.getElementById('step-0').classList.add('active');
       document.getElementById('progressBar').style.display = 'none';
       document.getElementById('progressFill').style.width = '0%';
+    }
+
+    // === Cute Music Box ===
+    var audioCtx = null;
+    var musicPlaying = false;
+    var musicTimer = null;
+    var noteIndex = 0;
+
+    // Note frequencies (C4 = 261.63)
+    var N = {
+      C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+      C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00,
+      rest: 0
+    };
+
+    // Cute melody: [note, duration in beats]
+    var melody = [
+      [N.E5, 0.5], [N.D5, 0.5], [N.C5, 0.5], [N.D5, 0.5],
+      [N.E5, 0.5], [N.E5, 0.5], [N.E5, 1.0],
+      [N.D5, 0.5], [N.D5, 0.5], [N.D5, 1.0],
+      [N.E5, 0.5], [N.G5, 0.5], [N.G5, 1.0],
+      [N.E5, 0.5], [N.D5, 0.5], [N.C5, 0.5], [N.D5, 0.5],
+      [N.E5, 0.5], [N.E5, 0.5], [N.E5, 0.5], [N.E5, 0.5],
+      [N.D5, 0.5], [N.D5, 0.5], [N.E5, 0.5], [N.D5, 0.5],
+      [N.C5, 2.0],
+      [N.rest, 0.5]
+    ];
+
+    // Bass notes for chord progression
+    var bass = [
+      N.C4, N.C4, N.G4, N.G4, N.A4, N.A4, N.F4, N.F4
+    ];
+
+    var BPM = 120;
+    var beatDuration = 60000 / BPM; // ms per beat
+
+    function playNote(freq, duration, type, gainVal) {
+      if (freq === 0) return;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+
+      var now = audioCtx.currentTime;
+      var attack = 0.02;
+      var decay = duration * 0.6;
+      var vol = gainVal || 0.3;
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(vol, now + attack);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + decay);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + decay + 0.1);
+    }
+
+    function playMelodyNote() {
+      if (!musicPlaying) return;
+
+      var note = melody[noteIndex % melody.length];
+      var noteDur = note[1] * beatDuration / 1000; // seconds
+      var beatInPhrase = noteIndex % 32;
+
+      // Play melody note (music box sound - triangle wave)
+      playNote(note[0], noteDur, 'triangle', 0.25);
+
+      // Add a harmonic (sine wave at 2x freq for bell-like quality)
+      if (note[0] !== 0) {
+        playNote(note[0] * 2, noteDur * 0.5, 'sine', 0.08);
+      }
+
+      // Play bass note at start of each phrase section
+      if (beatInPhrase % 4 === 0) {
+        var bassIdx = Math.floor(beatInPhrase / 4) % bass.length;
+        playNote(bass[bassIdx] / 2, 2.0, 'sine', 0.12);
+      }
+
+      noteIndex++;
+      musicTimer = setTimeout(playMelodyNote, note[1] * beatDuration);
+    }
+
+    function toggleMusic() {
+      var toggle = document.getElementById('musicToggle');
+      var icon = document.getElementById('musicIcon');
+
+      if (!musicPlaying) {
+        // Start
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        musicPlaying = true;
+        noteIndex = 0;
+        toggle.classList.add('playing');
+        icon.textContent = '🎶';
+        playMelodyNote();
+      } else {
+        // Stop
+        musicPlaying = false;
+        clearTimeout(musicTimer);
+        toggle.classList.remove('playing');
+        icon.textContent = '🎵';
+      }
     }
   </script>
 
