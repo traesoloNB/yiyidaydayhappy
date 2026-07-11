@@ -263,6 +263,31 @@
       color: var(--pink-500);
     }
 
+    /* Multi-select count badge */
+    .option-btn .select-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--pink-400);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(0);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .option-btn .select-badge.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
     /* === Naughty "Refuse" Button === */
     .refuse-btn {
       position: relative;
@@ -996,7 +1021,7 @@
       <div class="step" id="step-2">
         <div class="question-card">
           <div class="step-title">我们吃点什么？</div>
-          <div class="step-subtitle">挑一个今天想吃的~</div>
+          <div class="step-subtitle">挑几个想吃的~（可多选）</div>
 
           <div class="option-grid" id="foodGrid">
             <div class="option-btn" data-value="火锅" data-icon="🍲">
@@ -1383,18 +1408,25 @@
     }
 
     // === Option Selection ===
-    function setupGrid(gridId, key, nextBtnId, specialHandler) {
+    // isMulti: if true, toggle selection instead of single-select
+    function setupGrid(gridId, key, nextBtnId, specialHandler, isMulti) {
       var grid = document.getElementById(gridId);
       var btns = grid.querySelectorAll('.option-btn');
       var nextBtn = document.getElementById(nextBtnId);
 
+      // Initialize badges for multi-select
+      if (isMulti) {
+        btns.forEach(function(btn) {
+          if (!btn.querySelector('.select-badge')) {
+            var badge = document.createElement('span');
+            badge.className = 'select-badge';
+            btn.appendChild(badge);
+          }
+        });
+      }
+
       btns.forEach(function(btn) {
         btn.addEventListener('click', function() {
-          // Deselect all
-          btns.forEach(function(b) { b.classList.remove('selected'); });
-          // Select this
-          btn.classList.add('selected');
-
           var val = btn.getAttribute('data-value');
           var icon = btn.getAttribute('data-icon');
 
@@ -1402,16 +1434,68 @@
             return;
           }
 
-          selections[key] = {
-            value: val,
-            icon: icon
-          };
-          nextBtn.classList.add('enabled');
+          if (isMulti) {
+            // Toggle selection
+            btn.classList.toggle('selected');
+            updateMultiSelection(gridId, key, nextBtnId);
+          } else {
+            // Single select
+            btns.forEach(function(b) { b.classList.remove('selected'); });
+            btn.classList.add('selected');
+            selections[key] = { value: val, icon: icon };
+            nextBtn.classList.add('enabled');
+          }
         });
       });
     }
 
-    setupGrid('foodGrid', 'food', 'nextFood');
+    function updateMultiSelection(gridId, key, nextBtnId) {
+      var grid = document.getElementById(gridId);
+      var selected = grid.querySelectorAll('.option-btn.selected');
+      var nextBtn = document.getElementById(nextBtnId);
+
+      if (selected.length === 0) {
+        selections[key] = null;
+        nextBtn.classList.remove('enabled');
+        grid.querySelectorAll('.select-badge').forEach(function(b) {
+          b.classList.remove('visible');
+          b.textContent = '';
+        });
+        return;
+      }
+
+      var values = [];
+      var icons = [];
+      var order = [];
+      selected.forEach(function(b) {
+        values.push(b.getAttribute('data-value'));
+        icons.push(b.getAttribute('data-icon'));
+        order.push(b);
+      });
+
+      selections[key] = {
+        value: values.join('、'),
+        icon: icons.join(''),
+        list: values,
+        iconsList: icons
+      };
+      nextBtn.classList.add('enabled');
+
+      // Update badges - hide all first, then show with index for selected
+      grid.querySelectorAll('.select-badge').forEach(function(b) {
+        b.classList.remove('visible');
+        b.textContent = '';
+      });
+      order.forEach(function(b, idx) {
+        var badge = b.querySelector('.select-badge');
+        if (badge) {
+          badge.textContent = idx + 1;
+          badge.classList.add('visible');
+        }
+      });
+    }
+
+    setupGrid('foodGrid', 'food', 'nextFood', null, true);
 
     // Activity grid with custom input support
     setupGrid('activityGrid', 'activity', 'nextActivity', function(val, icon, btn) {
@@ -1824,7 +1908,17 @@
 
     // === Show Result ===
     function showResult() {
-      document.getElementById('resultFood').textContent = selections.food.icon + ' ' + selections.food.value;
+      var foodEl = document.getElementById('resultFood');
+      if (selections.food.list && selections.food.list.length > 0) {
+        // Multi-select: show tags
+        var html = '';
+        selections.food.list.forEach(function(item, idx) {
+          html += '<span style="display:inline-block;background:var(--pink-50);border:1px solid var(--pink-200);border-radius:20px;padding:3px 12px;margin:2px 3px;font-size:14px;">' + selections.food.iconsList[idx] + ' ' + item + '</span>';
+        });
+        foodEl.innerHTML = html;
+      } else {
+        foodEl.textContent = selections.food.icon + ' ' + selections.food.value;
+      }
       document.getElementById('resultActivity').textContent = selections.activity.icon + ' ' + selections.activity.value;
       document.getElementById('resultTime').textContent = selections.time.icon + ' ' + selections.time.value;
 
@@ -1866,6 +1960,10 @@
       // Reset all grids
       document.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
       document.querySelectorAll('.btn-next').forEach(function(b) { b.classList.remove('enabled'); });
+      document.querySelectorAll('.select-badge').forEach(function(b) {
+        b.classList.remove('visible');
+        b.textContent = '';
+      });
 
       // Reset custom activity input
       var customWrap = document.getElementById('customActivityWrap');
