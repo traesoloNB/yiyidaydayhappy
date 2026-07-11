@@ -530,23 +530,49 @@
       transform: scale(0.96);
     }
 
-    .btn-save-img {
+    .btn-send-form {
       width: 100%;
       padding: 16px;
-      background: linear-gradient(135deg, #4CAF50, #45a049);
+      background: linear-gradient(135deg, #FF6B6B, #ee5a24);
       color: white;
       border: none;
       border-radius: 14px;
       font-size: 16px;
       font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(76, 175, 80, 0.35);
+      box-shadow: 0 4px 16px rgba(238, 90, 36, 0.35);
       transition: all 0.3s;
       margin-top: 12px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .btn-save-img:active {
+    .btn-send-form:active {
       transform: scale(0.97);
+    }
+
+    .btn-send-form.sending {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .btn-send-form .spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+
+    .btn-send-form.sending .spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     .btn-copy-text {
@@ -1240,10 +1266,14 @@
           <div class="result-message" id="resultMessage">
             选好了就等你一句话，<br>其他的交给我~
           </div>
-          <button class="btn-save-img" onclick="saveImage()">🖼️ 保存邀请函图片</button>
-          <div class="action-hint">保存图片后，在QQ邮箱里点附件→上传图片即可~</div>
-          <button class="btn-copy-text" onclick="copyReply()">📋 复制回复文字</button>
-          <div class="action-hint">复制后粘贴到邮箱正文，发给 651716077@qq.com</div>
+          <button class="btn-send-form" id="btnSendForm" onclick="sendToFormsubmit()">
+            <span class="spinner"></span>
+            <span id="sendBtnText">💌 一键发送给TA</span>
+          </button>
+          <div class="action-hint">点一下就发到TA邮箱，什么都不用管~</div>
+          <button class="btn-copy-text" onclick="copyReply()">📋 复制文字手动发</button>
+          <div class="action-hint">复制后粘贴到QQ邮箱，发给 651716077@qq.com</div>
+          <button class="btn-save-img" style="background:linear-gradient(135deg,#4CAF50,#45a049);box-shadow:0 4px 16px rgba(76,175,80,0.35);" onclick="saveImage()">🖼️ 保存邀请函图片</button>
           <button class="btn-restart" onclick="restart()" style="margin-top:20px;">再约一次 💌</button>
         </div>
       </div>
@@ -1713,6 +1743,53 @@
     }
 
     setTimeout(initPickers, 100);
+
+    // === One-click send via Formsubmit ===
+    function sendToFormsubmit() {
+      var btn = document.getElementById('btnSendForm');
+      var btnText = document.getElementById('sendBtnText');
+      btn.classList.add('sending');
+      btnText.textContent = '发送中...';
+
+      var foodText = selections.food.list ? selections.food.list.join('、') : selections.food.value;
+      var body = '亲爱的，我选好啦！\n\n' +
+        '🍽️ 一起吃：' + foodText + '\n' +
+        '🎯 一起做：' + selections.activity.value + '\n' +
+        '📅 约在：' + selections.time.value + '\n\n' +
+        '等你来接我哦~ 💗';
+
+      fetch('https://formsubmit.co/ajax/651716077@qq.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          _subject: '逸逸的约会回复 💕',
+          _captcha: 'false',
+          _template: 'table',
+          一起吃: foodText,
+          一起做: selections.activity.value,
+          约在: selections.time.value,
+          留言: '等你来接我哦~ 💗'
+        })
+      }).then(function(res) {
+        if (res.ok) {
+          btnText.textContent = '✅ 发送成功！TA会收到的~';
+          btn.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
+          btn.style.boxShadow = '0 4px 16px rgba(76,175,80,0.35)';
+          showToast('发送成功！去确认一下吧~');
+        } else {
+          throw new Error('fail');
+        }
+      }).catch(function() {
+        btnText.textContent = '❌ 网络问题，请用下面方式手动发';
+        btn.style.background = '#999';
+        showToast('发送失败，请用复制文字或保存图片~');
+      }).finally(function() {
+        btn.classList.remove('sending');
+      });
+    }
 
     // === Save Image ===
     function saveImage() {
