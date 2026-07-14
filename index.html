@@ -1049,6 +1049,70 @@
       box-shadow: 0 0 0 4px rgba(255, 92, 138, 0.12);
     }
 
+    /* === Handwritten Note Page === */
+    .note-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: var(--shadow-card);
+      text-align: center;
+    }
+
+    .note-emoji {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .note-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-dark);
+      margin-bottom: 6px;
+    }
+
+    .note-subtitle {
+      font-size: 14px;
+      color: var(--text-light);
+      margin-bottom: 20px;
+    }
+
+    .note-textarea {
+      width: 100%;
+      min-height: 140px;
+      padding: 16px;
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--text-dark);
+      background: #fffefc;
+      border: 2px dashed var(--pink-200);
+      border-radius: var(--radius);
+      outline: none;
+      resize: vertical;
+      font-family: inherit;
+      transition: all 0.3s;
+    }
+
+    .note-textarea::placeholder {
+      color: var(--text-light);
+      font-weight: 400;
+    }
+
+    .note-textarea:focus {
+      border-color: var(--pink-400);
+      border-style: solid;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(255, 92, 138, 0.1);
+    }
+
+    .note-hint {
+      font-size: 12px;
+      color: var(--text-light);
+      margin-top: 8px;
+      text-align: left;
+    }
+
     /* === Mobile Responsive === */
     @media (max-width: 380px) {
       .option-grid { gap: 10px; }
@@ -1153,6 +1217,15 @@
               <span class="icon">🍰</span>
               <span class="label">甜品</span>
             </div>
+            <div class="option-btn" data-value="其他" data-icon="✏️" id="foodOther">
+              <span class="icon">✏️</span>
+              <span class="label">其他...</span>
+            </div>
+          </div>
+
+          <div class="custom-input-wrap" id="customFoodWrap" style="display:none;">
+            <div class="custom-input-label">我想吃...</div>
+            <input type="text" class="custom-input" id="customFoodInput" placeholder="输入你想吃的东西~">
           </div>
 
           <div style="text-align:center; position:relative;">
@@ -1223,8 +1296,25 @@
         </div>
       </div>
 
-      <!-- Step 4: Date & Time Selection (iOS Wheel Picker) -->
+      <!-- Step 4: Handwritten Note -->
       <div class="step" id="step-4">
+        <div class="note-card">
+          <div class="note-emoji">✍️</div>
+          <div class="note-title">还有什么想告诉TA的吗？</div>
+          <div class="note-subtitle">写点悄悄话~ 不想写也可以跳过</div>
+
+          <textarea class="note-textarea" id="noteInput" placeholder="比如：记得穿好看一点哦~&#10;或者：我想吃的那家要排队，早点去~&#10;也可以什么都不写直接下一步~"></textarea>
+          <div class="note-hint">💡 写的内容会一起发给TA哦</div>
+
+          <div class="nav-row" style="margin-top:20px;">
+            <button class="btn-back" onclick="goBack()">← 返回</button>
+            <button class="btn-next enabled" id="nextNote" onclick="goNext()" style="opacity:1;pointer-events:auto;">下一步 →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5: Date & Time Selection (iOS Wheel Picker) -->
+      <div class="step" id="step-5">
         <div class="datetime-card">
           <div class="datetime-icon">📅</div>
           <div class="datetime-title">所以...你什么时候有空？😏</div>
@@ -1292,7 +1382,7 @@
       </div>
 
       <!-- Step 5: Loading -->
-      <div class="step" id="step-5">
+      <div class="step" id="step-6">
         <div style="text-align:center;">
           <div style="font-size:48px; margin-bottom:16px;">✨</div>
           <div class="loading-dots">
@@ -1302,8 +1392,8 @@
         </div>
       </div>
 
-      <!-- Step 6: Result -->
-      <div class="step" id="step-6">
+      <!-- Step 7: Result -->
+      <div class="step" id="step-7">
         <div class="result-card" id="resultCard">
           <div class="result-emoji">💝</div>
           <div class="result-title">约会邀请函</div>
@@ -1329,6 +1419,13 @@
                 <div class="result-item-value" id="resultTime">--</div>
               </div>
             </div>
+            <div class="result-item" id="resultNoteWrap" style="display:none;">
+              <div class="result-item-icon" style="background:#fff0f5;">✍️</div>
+              <div class="result-item-content">
+                <div class="result-item-label">悄悄话</div>
+                <div class="result-item-value" id="resultNote" style="font-size:14px;line-height:1.6;">--</div>
+              </div>
+            </div>
           </div>
           <div class="result-message" id="resultMessage">
             选好了就等你一句话，<br>其他的交给我~
@@ -1348,7 +1445,7 @@
   <script>
     // === State ===
     var currentStep = 0;
-    var selections = { food: null, activity: null, time: null };
+    var selections = { food: null, activity: null, note: null, time: null };
     var refuseCount = { food: 0, activity: 0, time: 0 };
 
     // === Init Floating Hearts ===
@@ -1447,7 +1544,15 @@
       // Validate
       if (currentStep === 2 && !selections.food) return;
       if (currentStep === 3 && !selections.activity) return;
-      if (currentStep === 4 && !selections.time) return;
+      if (currentStep === 5 && !selections.time) return;
+
+      // Save note if on note step
+      if (currentStep === 4) {
+        var noteVal = document.getElementById('noteInput').value.trim();
+        if (noteVal) {
+          selections.note = noteVal;
+        }
+      }
 
       current.classList.remove('active');
       current.classList.add('exit-left');
@@ -1458,12 +1563,12 @@
       updateProgress();
 
       // Auto-advance loading
-      if (currentStep === 5) {
+      if (currentStep === 6) {
         startLoading();
       }
 
       // Show result
-      if (currentStep === 6) {
+      if (currentStep === 7) {
         showResult();
       }
     }
@@ -1492,9 +1597,9 @@
     function updateProgress() {
       var bar = document.getElementById('progressBar');
       var fill = document.getElementById('progressFill');
-      if (currentStep >= 1 && currentStep <= 4) {
+      if (currentStep >= 1 && currentStep <= 5) {
         bar.style.display = 'block';
-        var pct = ((currentStep - 1) / 3) * 100;
+        var pct = ((currentStep - 1) / 4) * 100;
         fill.style.width = pct + '%';
       } else {
         bar.style.display = 'none';
@@ -1589,7 +1694,75 @@
       });
     }
 
-    setupGrid('foodGrid', 'food', 'nextFood', null, true);
+    // Food grid with custom input support
+    setupGrid('foodGrid', 'food', 'nextFood', function(val, icon, btn) {
+      var wrap = document.getElementById('customFoodWrap');
+      var input = document.getElementById('customFoodInput');
+      var nextBtn = document.getElementById('nextFood');
+
+      if (val === '其他') {
+        wrap.style.display = 'block';
+        setTimeout(function() { input.focus(); }, 100);
+        // Remove from selections until typed
+        if (selections.food && selections.food.list) {
+          var idx = selections.food.list.indexOf('其他');
+          if (idx >= 0) {
+            selections.food.list.splice(idx, 1);
+            selections.food.iconsList.splice(idx, 1);
+            if (selections.food.list.length === 0) {
+              selections.food = null;
+              nextBtn.classList.remove('enabled');
+            }
+          }
+        }
+
+        input.oninput = function() {
+          var text = input.value.trim();
+          if (text) {
+            var existing = selections.food || { list: [], iconsList: [] };
+            // Remove any previous custom entry
+            var cIdx = existing.list.indexOf('其他');
+            if (cIdx >= 0) {
+              existing.list.splice(cIdx, 1);
+              existing.iconsList.splice(cIdx, 1);
+            }
+            existing.list.push(text);
+            existing.iconsList.push('✨');
+            selections.food = {
+              value: existing.list.join('、'),
+              icon: existing.iconsList.join(''),
+              list: existing.list,
+              iconsList: existing.iconsList
+            };
+            nextBtn.classList.add('enabled');
+          } else {
+            var existing2 = selections.food || { list: [], iconsList: [] };
+            var cIdx2 = existing2.list.indexOf('其他');
+            if (cIdx2 >= 0) {
+              existing2.list.splice(cIdx2, 1);
+              existing2.iconsList.splice(cIdx2, 1);
+            }
+            if (existing2.list.length === 0) {
+              selections.food = null;
+              nextBtn.classList.remove('enabled');
+            } else {
+              selections.food = {
+                value: existing2.list.join('、'),
+                icon: existing2.iconsList.join(''),
+                list: existing2.list,
+                iconsList: existing2.iconsList
+              };
+            }
+          }
+        };
+        return true;
+      } else {
+        wrap.style.display = 'none';
+        input.value = '';
+        input.oninput = null;
+        return false;
+      }
+    }, true);
 
     // Activity grid with custom input support
     setupGrid('activityGrid', 'activity', 'nextActivity', function(val, icon, btn) {
@@ -1816,11 +1989,22 @@
       btnText.textContent = '发送中...';
 
       var foodText = selections.food.list ? selections.food.list.join('、') : selections.food.value;
+      var noteText = selections.note ? selections.note : '等你来接我哦~ 💗';
       var body = '亲爱的，我选好啦！\n\n' +
         '🍽️ 一起吃：' + foodText + '\n' +
         '🎯 一起做：' + selections.activity.value + '\n' +
         '📅 约在：' + selections.time.value + '\n\n' +
-        '等你来接我哦~ 💗';
+        '💌 悄悄话：' + noteText;
+
+      var formData = {
+        _subject: '逸逸的约会回复 💕',
+        _captcha: 'false',
+        _template: 'table',
+        一起吃: foodText,
+        一起做: selections.activity.value,
+        约在: selections.time.value,
+        悄悄话: noteText
+      };
 
       fetch('https://formsubmit.co/ajax/651716077@qq.com', {
         method: 'POST',
@@ -1828,15 +2012,7 @@
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({
-          _subject: '逸逸的约会回复 💕',
-          _captcha: 'false',
-          _template: 'table',
-          一起吃: foodText,
-          一起做: selections.activity.value,
-          约在: selections.time.value,
-          留言: '等你来接我哦~ 💗'
-        })
+        body: JSON.stringify(formData)
       }).then(function(res) {
         if (res.ok) {
           btnText.textContent = '✅ 发送成功！TA会收到的~';
@@ -2063,6 +2239,16 @@
       document.getElementById('resultActivity').textContent = selections.activity.icon + ' ' + selections.activity.value;
       document.getElementById('resultTime').textContent = selections.time.icon + ' ' + selections.time.value;
 
+      // Show note if exists
+      var noteWrap = document.getElementById('resultNoteWrap');
+      var noteEl = document.getElementById('resultNote');
+      if (selections.note) {
+        noteWrap.style.display = 'flex';
+        noteEl.textContent = selections.note;
+      } else {
+        noteWrap.style.display = 'none';
+      }
+
       // Generate sweet message
       var msg = '选好了就等你一句话，<br>其他的交给我~';
       document.getElementById('resultMessage').innerHTML = msg;
@@ -2094,7 +2280,7 @@
 
     // === Restart ===
     function restart() {
-      selections = { food: null, activity: null, time: null };
+      selections = { food: null, activity: null, note: null, time: null };
       refuseCount = { food: 0, activity: 0, time: 0 };
       refuseWelcomeCount = 0;
 
@@ -2106,11 +2292,21 @@
         b.textContent = '';
       });
 
+      // Reset custom food input
+      var customFoodWrap = document.getElementById('customFoodWrap');
+      var customFoodInput = document.getElementById('customFoodInput');
+      if (customFoodWrap) { customFoodWrap.style.display = 'none'; }
+      if (customFoodInput) { customFoodInput.value = ''; customFoodInput.oninput = null; }
+
       // Reset custom activity input
       var customWrap = document.getElementById('customActivityWrap');
       var customInput = document.getElementById('customActivityInput');
       if (customWrap) { customWrap.style.display = 'none'; }
       if (customInput) { customInput.value = ''; customInput.oninput = null; }
+
+      // Reset note input
+      var noteInput = document.getElementById('noteInput');
+      if (noteInput) { noteInput.value = ''; }
 
       // Reset date/time pickers
       var t2 = new Date();
@@ -2126,6 +2322,15 @@
           btn.style.opacity = '';
         }
       });
+
+      // Reset send button
+      var sendBtn = document.getElementById('btnSendForm');
+      var sendBtnText = document.getElementById('sendBtnText');
+      if (sendBtn) {
+        sendBtn.style.background = '';
+        sendBtn.style.boxShadow = '';
+      }
+      if (sendBtnText) { sendBtnText.textContent = '💌 一键发送给TA'; }
 
       // Go back to step 0
       var allSteps = document.querySelectorAll('.step');
